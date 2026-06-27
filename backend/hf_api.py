@@ -116,7 +116,8 @@ def trending(repo_type: str, limit: int, token: str | None) -> list:
     headers = {"authorization": f"Bearer {token}"} if token else {}
     r = requests.get(
         TRENDING_URL,
-        params={"type": repo_type, "limit": limit},
+        # The trending endpoint rejects limit > 20 with a 400.
+        params={"type": repo_type, "limit": min(limit, 20)},
         headers=headers,
         timeout=20,
     )
