@@ -187,3 +187,23 @@ button.mini { background: var(--bg-3); border: 1px solid var(--border); color: v
 .coll-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); cursor: pointer; }
 .coll-item:hover .ci-id { color: var(--accent); }
 .coll-item .ci-id { word-break: break-all; font-size: 13px; }
+
+/* Collections shown in the Browse results grid */
+.results.as-list { grid-template-columns: 1fr; }
+
+/* Dataset preview (in repo modal) */
+.ds-preview { border-bottom: 1px solid var(--border); background: var(--bg); }
+.ds-preview.hidden { display: none; }
+.ds-prev-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 20px; }
+.ds-prev-title { font-weight: 600; }
+.ds-prev-meta { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+.ds-sel { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+.ds-sel select { padding: 4px 8px; }
+.ds-prev-note { padding: 12px 20px; color: var(--muted); font-size: 13px; }
+.ds-prev-table { overflow: auto; max-height: 240px; padding: 0 20px 12px; }
+.ds-prev-table table { border-collapse: collapse; font-size: 12px; }
+.ds-prev-table th, .ds-prev-table td {
+  border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top;
+  max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ds-prev-table th { background: var(--bg-3); position: sticky; top: 0; color: var(--muted); }

@@ -91,14 +91,33 @@ def api_discover():
 
 @app.route("/api/collections")
 def api_collections():
+    q = request.args.get("q", "").strip()
     sort = request.args.get("sort", "trending")
     try:
-        limit = min(24, max(1, int(request.args.get("limit", 12))))
+        limit = min(30, max(1, int(request.args.get("limit", 12))))
     except (ValueError, TypeError):
         limit = 12
     token = config.load_settings().get("token")
     try:
-        return jsonify({"collections": hf_api.collections_list(sort, limit, token)})
+        if q:
+            cols = hf_api.search_collections(q, limit, token)
+        else:
+            cols = hf_api.collections_list(sort, limit, token)
+        return jsonify({"collections": cols})
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/dataset-preview")
+def api_dataset_preview():
+    dataset_id = request.args.get("id", "").strip()
+    if not dataset_id:
+        return jsonify({"error": "Missing dataset id"}), 400
+    cfg = request.args.get("config", "").strip()
+    split = request.args.get("split", "").strip()
+    token = config.load_settings().get("token")
+    try:
+        return jsonify(hf_api.dataset_preview(dataset_id, cfg, split, token))
     except Exception as e:  # noqa: BLE001
         return jsonify({"error": str(e)}), 400
 

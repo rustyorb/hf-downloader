@@ -57,6 +57,7 @@
         <div class="seg">
           <button class="seg-btn active" data-rtype="model">Models</button>
           <button class="seg-btn" data-rtype="dataset">Datasets</button>
+          <button class="seg-btn" data-rtype="collection">Collections</button>
         </div>
         <input id="searchInput" type="text" placeholder="Search by name, e.g. llama, bert, squad…" />
         <select id="sortSelect">
@@ -132,6 +133,7 @@
         <span id="selSummary" class="sel-summary"></span>
         <button id="downloadSelected" class="primary">Download Selected</button>
       </div>
+      <div id="datasetPreview" class="ds-preview hidden"></div>
       <div id="fileList" class="file-list"></div>
       <details class="readme">
         <summary>README</summary>

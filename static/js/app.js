@@ -3,6 +3,10 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
 const state = {
   rtype: "model",
   dtype: "dataset",    // discover tab repo type (datasets-first)
@@ -95,8 +99,16 @@ async function doSearch() {
   const q = $("#searchInput").value.trim();
   const sort = $("#sortSelect").value;
   const box = $("#results");
+  box.classList.toggle("as-list", state.rtype === "collection");
   box.innerHTML = '<div class="spinner">Searching…</div>';
   try {
+    if (state.rtype === "collection") {
+      const d = await jget(`/api/collections?q=${encodeURIComponent(q)}&limit=24`);
+      if (!d.collections.length) { box.innerHTML = '<div class="empty">No collections found.</div>'; return; }
+      box.innerHTML = "";
+      d.collections.forEach((c) => box.appendChild(collectionCard(c)));
+      return;
+    }
     const d = await jget(`/api/search?q=${encodeURIComponent(q)}&type=${state.rtype}&sort=${sort}&limit=40`);
     if (!d.results.length) { box.innerHTML = '<div class="empty">No results.</div>'; return; }
     box.innerHTML = "";
@@ -271,6 +283,14 @@ function renderRepo(info) {
   $("#readmeContent").textContent = info.readme || "(no README)";
   $("#fileFilter").value = "";
   $("#selectAll").checked = false;
+  const prev = $("#datasetPreview");
+  if (info.type === "dataset") {
+    prev.classList.remove("hidden");
+    loadPreview(info.id, "", "");
+  } else {
+    prev.classList.add("hidden");
+    prev.innerHTML = "";
+  }
   renderFiles();
 }
 
@@ -317,6 +337,49 @@ function updateSelSummary() {
   const sel = state.repo.files.filter((f) => state.selected.has(f.path));
   const bytes = sel.reduce((a, f) => a + (f.size || 0), 0);
   $("#selSummary").textContent = `${sel.length} selected · ${fmtBytes(bytes)}`;
+}
+
+// ---------- dataset preview ----------
+async function loadPreview(id, configName, splitName) {
+  const box = $("#datasetPreview");
+  box.innerHTML = '<div class="ds-prev-note">Loading preview…</div>';
+  let url = `/api/dataset-preview?id=${encodeURIComponent(id)}`;
+  if (configName) url += `&config=${encodeURIComponent(configName)}`;
+  if (splitName) url += `&split=${encodeURIComponent(splitName)}`;
+  try {
+    renderPreview(id, await jget(url));
+  } catch (e) {
+    box.innerHTML = `<div class="ds-prev-note">Preview unavailable: ${e.message}</div>`;
+  }
+}
+
+function renderPreview(id, d) {
+  const box = $("#datasetPreview");
+  if (!d.available) {
+    box.innerHTML = `<div class="ds-prev-note">👀 Preview not available${d.error ? " — " + escapeHtml(d.error) : ""}</div>`;
+    return;
+  }
+  const meta = [
+    d.num_rows != null ? `${fmtNum(d.num_rows)} rows` : "",
+    d.num_bytes ? fmtBytes(d.num_bytes) : "",
+  ].filter(Boolean).join(" · ");
+  const sel = (lbl, sid, opts, cur) => (opts.length > 1
+    ? `<label class="ds-sel">${lbl} <select id="${sid}">${opts.map((o) => `<option ${o === cur ? "selected" : ""}>${escapeHtml(o)}</option>`).join("")}</select></label>`
+    : "");
+  const thead = `<tr>${d.columns.map((c) => `<th>${escapeHtml(c)}</th>`).join("")}</tr>`;
+  const tbody = d.rows.map((r) =>
+    `<tr>${d.columns.map((c) => `<td>${escapeHtml(r[c] ?? "")}</td>`).join("")}</tr>`).join("");
+  box.innerHTML = `
+    <div class="ds-prev-bar">
+      <span class="ds-prev-title">👀 Preview <span class="ds-prev-meta">${meta}</span></span>
+      ${sel("config", "prevConfig", d.configs, d.config)}
+      ${sel("split", "prevSplit", d.splits, d.split)}
+    </div>
+    <div class="ds-prev-table"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
+  const cfgEl = $("#prevConfig");
+  const splitEl = $("#prevSplit");
+  if (cfgEl) cfgEl.addEventListener("change", () => loadPreview(id, cfgEl.value, ""));
+  if (splitEl) splitEl.addEventListener("change", () => loadPreview(id, d.config, splitEl.value));
 }
 
 $("#closeModal").addEventListener("click", () => $("#repoModal").classList.add("hidden"));

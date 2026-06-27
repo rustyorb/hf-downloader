@@ -1,4 +1,6 @@
 """HuggingFace Hub search and repository info helpers."""
+import json
+
 import requests
 
 from huggingface_hub import HfApi, hf_hub_url
@@ -172,3 +174,101 @@ def collection_items(slug: str, token: str | None) -> dict:
         if it.item_type in ("model", "dataset")
     ]
     return {"title": full.title, "items": items, "total": len(all_items)}
+
+
+def _map_raw_collection(c: dict) -> dict:
+    owner = c.get("owner") or {}
+    if isinstance(owner, dict):
+        owner_name = owner.get("name") or owner.get("fullname") or ""
+    else:
+        owner_name = str(owner)
+    slug = c.get("slug", "")
+    return {
+        "slug": slug,
+        "title": c.get("title", ""),
+        "owner": owner_name,
+        "upvotes": c.get("upvotes", 0) or 0,
+        "url": f"https://huggingface.co/collections/{slug}",
+    }
+
+
+def search_collections(query: str, limit: int, token: str | None) -> list:
+    """Full-text search collections via the raw Hub endpoint (the library lacks `q`)."""
+    headers = {"authorization": f"Bearer {token}"} if token else {}
+    r = requests.get(
+        "https://huggingface.co/api/collections",
+        params={"q": query, "limit": limit},
+        headers=headers,
+        timeout=20,
+    )
+    r.raise_for_status()
+    data = r.json()
+    return [_map_raw_collection(c) for c in (data or []) if isinstance(c, dict)]
+
+
+# ---------- Dataset preview (HF Datasets Viewer) ----------
+DATASETS_VIEWER = "https://datasets-server.huggingface.co"
+
+
+def _trunc(val, n: int = 200) -> str:
+    s = val if isinstance(val, str) else json.dumps(val, ensure_ascii=False, default=str)
+    s = " ".join(s.split())
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+
+def dataset_preview(dataset_id: str, config: str, split: str, token: str | None) -> dict:
+    """Preview a dataset via the HF Datasets Viewer: columns + first ~10 rows."""
+    headers = {"authorization": f"Bearer {token}"} if token else {}
+
+    def _get(path, **params):
+        return requests.get(f"{DATASETS_VIEWER}/{path}", params=params, headers=headers, timeout=25)
+
+    def _err(resp):
+        try:
+            return resp.json().get("error", "") or f"Viewer error ({resp.status_code})."
+        except Exception:
+            return f"Viewer error ({resp.status_code})."
+
+    rs = _get("splits", dataset=dataset_id)
+    if not rs.ok:
+        return {"available": False, "error": _err(rs)}
+    splits = rs.json().get("splits", [])
+    if not splits:
+        return {"available": False, "error": "No viewable splits."}
+
+    configs = []
+    for s in splits:
+        if s["config"] not in configs:
+            configs.append(s["config"])
+    config = config if config in configs else configs[0]
+    cfg_splits = [s["split"] for s in splits if s["config"] == config]
+    split = split if split in cfg_splits else cfg_splits[0]
+
+    num_rows = num_bytes = None
+    rz = _get("size", dataset=dataset_id, config=config)
+    if rz.ok:
+        cfg_size = (rz.json().get("size", {}) or {}).get("config", {}) or {}
+        num_rows = cfg_size.get("num_rows")
+        num_bytes = cfg_size.get("num_bytes_original_files")
+
+    rf = _get("first-rows", dataset=dataset_id, config=config, split=split)
+    if not rf.ok:
+        return {"available": False, "error": _err(rf)}
+    fr = rf.json()
+    columns = [f["name"] for f in fr.get("features", [])]
+    rows = [
+        {c: _trunc(item.get("row", {}).get(c)) for c in columns}
+        for item in fr.get("rows", [])[:10]
+    ]
+
+    return {
+        "available": True,
+        "configs": configs,
+        "splits": cfg_splits,
+        "config": config,
+        "split": split,
+        "num_rows": num_rows,
+        "num_bytes": num_bytes,
+        "columns": columns,
+        "rows": rows,
+    }
