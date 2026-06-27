@@ -174,3 +174,16 @@ button.mini { background: var(--bg-3); border: 1px solid var(--border); color: v
 .toast.err { border-color: var(--red); }
 .empty { color: var(--muted); text-align: center; padding: 40px; }
 .spinner { text-align: center; padding: 40px; color: var(--muted); }
+
+/* Discover / Collections */
+.disc-h { margin: 22px 0 0; font-size: 16px; }
+.collections { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.collection { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+.coll-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.collection h3 { margin: 0 0 4px; font-size: 15px; word-break: break-word; }
+.coll-sub { color: var(--muted); font-size: 12px; }
+.coll-items { display: none; margin-top: 12px; }
+.coll-items.open { display: block; }
+.coll-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); cursor: pointer; }
+.coll-item:hover .ci-id { color: var(--accent); }
+.coll-item .ci-id { word-break: break-all; font-size: 13px; }

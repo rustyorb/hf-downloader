@@ -1,4 +1,6 @@
 """HuggingFace Hub search and repository info helpers."""
+import requests
+
 from huggingface_hub import HfApi, hf_hub_url
 from huggingface_hub.utils import (
     GatedRepoError,
@@ -104,3 +106,68 @@ def repo_info(repo_id: str, repo_type: str, revision: str, token: str | None) ->
         "total_size": sum(f["size"] for f in files),
         "readme": card,
     }
+
+
+TRENDING_URL = "https://huggingface.co/api/trending"
+
+
+def trending(repo_type: str, limit: int, token: str | None) -> list:
+    """Top trending models or datasets via the Hub trending feed."""
+    headers = {"authorization": f"Bearer {token}"} if token else {}
+    r = requests.get(
+        TRENDING_URL,
+        params={"type": repo_type, "limit": limit},
+        headers=headers,
+        timeout=20,
+    )
+    r.raise_for_status()
+    data = r.json() or {}
+    results = []
+    for entry in data.get("recentlyTrending", []):
+        if entry.get("repoType") != repo_type:
+            continue
+        repo = entry.get("repoData") or {}
+        results.append({
+            "id": repo.get("id", ""),
+            "type": repo_type,
+            "downloads": repo.get("downloads", 0) or 0,
+            "likes": repo.get("likes", 0) or 0,
+            "tags": (repo.get("tags") or [])[:8],
+            "pipeline_tag": repo.get("pipeline_tag", "") or "",
+            "updated": str(repo.get("lastModified", "") or ""),
+        })
+    return results[:limit]
+
+
+def collections_list(sort: str, limit: int, token: str | None) -> list:
+    """List collections (trending or most-upvoted)."""
+    api = _api(token)
+    sort = sort if sort in ("trending", "upvotes", "lastModified") else "trending"
+    out = []
+    for c in api.list_collections(sort=sort, limit=limit):
+        owner = c.owner
+        if isinstance(owner, dict):
+            owner_name = owner.get("name") or owner.get("fullname") or ""
+        else:
+            owner_name = getattr(owner, "name", "") or str(owner or "")
+        out.append({
+            "slug": c.slug,
+            "title": c.title,
+            "owner": owner_name,
+            "upvotes": getattr(c, "upvotes", 0) or 0,
+            "url": f"https://huggingface.co/collections/{c.slug}",
+        })
+    return out
+
+
+def collection_items(slug: str, token: str | None) -> dict:
+    """Return the downloadable (model/dataset) items of a collection."""
+    api = _api(token)
+    full = api.get_collection(slug)
+    all_items = full.items or []
+    items = [
+        {"id": it.item_id, "type": it.item_type}
+        for it in all_items
+        if it.item_type in ("model", "dataset")
+    ]
+    return {"title": full.title, "items": items, "total": len(all_items)}

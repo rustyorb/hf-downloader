@@ -69,6 +69,52 @@ def api_search():
         return jsonify({"error": str(e)}), 400
 
 
+# ---------- Discover (trending + collections) ----------
+@app.route("/api/discover")
+def api_discover():
+    repo_type = request.args.get("type", "dataset")
+    sort = request.args.get("sort", "trending")
+    try:
+        limit = min(48, max(1, int(request.args.get("limit", 24))))
+    except (ValueError, TypeError):
+        limit = 24
+    token = config.load_settings().get("token")
+    try:
+        if sort == "trending":
+            results = hf_api.trending(repo_type, limit, token)
+        else:
+            results = hf_api.search("", repo_type, sort, limit, token)
+        return jsonify({"results": results})
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/collections")
+def api_collections():
+    sort = request.args.get("sort", "trending")
+    try:
+        limit = min(24, max(1, int(request.args.get("limit", 12))))
+    except (ValueError, TypeError):
+        limit = 12
+    token = config.load_settings().get("token")
+    try:
+        return jsonify({"collections": hf_api.collections_list(sort, limit, token)})
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/collection")
+def api_collection():
+    slug = request.args.get("slug", "").strip()
+    if not slug:
+        return jsonify({"error": "Missing collection slug"}), 400
+    token = config.load_settings().get("token")
+    try:
+        return jsonify(hf_api.collection_items(slug, token))
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": str(e)}), 400
+
+
 # ---------- Repo info ----------
 @app.route("/api/repo")
 def api_repo():

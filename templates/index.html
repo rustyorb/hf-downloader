@@ -13,7 +13,8 @@
       <h1>HF Downloader</h1>
     </div>
     <nav class="tabs">
-      <button class="tab active" data-tab="browse">Browse</button>
+      <button class="tab active" data-tab="discover">Discover</button>
+      <button class="tab" data-tab="browse">Browse</button>
       <button class="tab" data-tab="queue">Queue <span id="queueBadge" class="badge">0</span></button>
       <button class="tab" data-tab="history">History</button>
       <button class="tab" data-tab="settings">Settings</button>
@@ -22,8 +23,36 @@
   </header>
 
   <main>
+    <!-- DISCOVER -->
+    <section id="discover" class="panel active">
+      <div class="search-bar">
+        <div class="seg" id="discoverSeg">
+          <button class="seg-btn active" data-dtype="dataset">Datasets</button>
+          <button class="seg-btn" data-dtype="model">Models</button>
+        </div>
+        <select id="discoverSort">
+          <option value="trending">🔥 Trending</option>
+          <option value="downloads">Most downloads</option>
+          <option value="likes">Most likes</option>
+          <option value="lastModified">Recently updated</option>
+        </select>
+        <button id="discoverRefresh" class="primary">Refresh</button>
+      </div>
+      <h2 id="discoverHeading" class="disc-h">🔥 Trending</h2>
+      <div id="discoverGrid" class="results"></div>
+
+      <div class="row-between" style="margin-top:26px;">
+        <h2>Collections</h2>
+        <select id="collSort">
+          <option value="trending">🔥 Trending</option>
+          <option value="upvotes">Most upvoted</option>
+        </select>
+      </div>
+      <div id="collectionsList" class="collections"></div>
+    </section>
+
     <!-- BROWSE -->
-    <section id="browse" class="panel active">
+    <section id="browse" class="panel">
       <div class="search-bar">
         <div class="seg">
           <button class="seg-btn active" data-rtype="model">Models</button>

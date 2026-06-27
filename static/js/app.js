@@ -5,6 +5,8 @@ const $$ = (s) => document.querySelectorAll(s);
 
 const state = {
   rtype: "model",
+  dtype: "dataset",    // discover tab repo type (datasets-first)
+  browseLoaded: false, // lazy-load Browse on first open
   repo: null,          // current open repo info
   revision: "",
   selected: new Set(), // selected file paths
@@ -63,6 +65,8 @@ $$(".tab").forEach((b) =>
     $$(".panel").forEach((x) => x.classList.remove("active"));
     b.classList.add("active");
     $("#" + b.dataset.tab).classList.add("active");
+    if (b.dataset.tab === "discover") loadDiscover();
+    if (b.dataset.tab === "browse" && !state.browseLoaded) { state.browseLoaded = true; doSearch(); }
     if (b.dataset.tab === "history") loadHistory();
     if (b.dataset.tab === "settings") loadSettings();
   })
@@ -77,9 +81,9 @@ $("#themeToggle").addEventListener("click", async () => {
 });
 
 // ---------- search ----------
-$$(".seg-btn").forEach((b) =>
+$$("#browse .seg-btn").forEach((b) =>
   b.addEventListener("click", () => {
-    $$(".seg-btn").forEach((x) => x.classList.remove("active"));
+    $$("#browse .seg-btn").forEach((x) => x.classList.remove("active"));
     b.classList.add("active");
     state.rtype = b.dataset.rtype;
   })
@@ -116,6 +120,112 @@ function resultCard(it) {
     </div>
     <div>${pipe}${tags}</div>`;
   el.addEventListener("click", () => openRepo(it.id, it.type, ""));
+  return el;
+}
+
+// ---------- discover ----------
+$$("#discoverSeg .seg-btn").forEach((b) =>
+  b.addEventListener("click", () => {
+    $$("#discoverSeg .seg-btn").forEach((x) => x.classList.remove("active"));
+    b.classList.add("active");
+    state.dtype = b.dataset.dtype;
+    loadTrending();
+  })
+);
+$("#discoverSort").addEventListener("change", loadTrending);
+$("#discoverRefresh").addEventListener("click", loadDiscover);
+$("#collSort").addEventListener("change", loadCollections);
+
+function loadDiscover() {
+  loadTrending();
+  loadCollections();
+}
+
+const DISC_HEADINGS = {
+  trending: "🔥 Trending",
+  downloads: "Most downloaded",
+  likes: "Most liked",
+  lastModified: "Recently updated",
+};
+
+async function loadTrending() {
+  const grid = $("#discoverGrid");
+  const sort = $("#discoverSort").value;
+  $("#discoverHeading").textContent = DISC_HEADINGS[sort] || "Top";
+  grid.innerHTML = '<div class="spinner">Loading…</div>';
+  try {
+    const d = await jget(`/api/discover?type=${state.dtype}&sort=${sort}&limit=24`);
+    if (!d.results.length) { grid.innerHTML = '<div class="empty">Nothing to show.</div>'; return; }
+    grid.innerHTML = "";
+    d.results.forEach((it) => grid.appendChild(resultCard(it)));
+  } catch (e) {
+    grid.innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+async function loadCollections() {
+  const box = $("#collectionsList");
+  const sort = $("#collSort").value;
+  box.innerHTML = '<div class="spinner">Loading collections…</div>';
+  try {
+    const d = await jget(`/api/collections?sort=${sort}&limit=12`);
+    if (!d.collections.length) { box.innerHTML = '<div class="empty">No collections.</div>'; return; }
+    box.innerHTML = "";
+    d.collections.forEach((c) => box.appendChild(collectionCard(c)));
+  } catch (e) {
+    box.innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+function collectionCard(c) {
+  const el = document.createElement("div");
+  el.className = "collection";
+  el.innerHTML = `
+    <div class="coll-head">
+      <div>
+        <h3>${c.title}</h3>
+        <div class="coll-sub">${c.owner} · ▲ ${fmtNum(c.upvotes)}</div>
+      </div>
+      <button class="mini coll-toggle">View items</button>
+    </div>
+    <div class="coll-items"></div>`;
+  const toggle = el.querySelector(".coll-toggle");
+  const itemsBox = el.querySelector(".coll-items");
+  toggle.addEventListener("click", async () => {
+    if (itemsBox.classList.contains("open")) {
+      itemsBox.classList.remove("open");
+      itemsBox.innerHTML = "";
+      toggle.textContent = "View items";
+      return;
+    }
+    toggle.textContent = "Hide";
+    itemsBox.classList.add("open");
+    itemsBox.innerHTML = '<div class="spinner">Loading…</div>';
+    try {
+      const d = await jget(`/api/collection?slug=${encodeURIComponent(c.slug)}`);
+      itemsBox.innerHTML = "";
+      if (!d.items.length) {
+        itemsBox.innerHTML = '<div class="empty">No downloadable model/dataset items.</div>';
+      }
+      d.items.forEach((it) => {
+        const row = document.createElement("div");
+        row.className = "coll-item";
+        row.innerHTML = `<span class="tag ${it.type === "model" ? "pipe" : ""}">${it.type}</span><span class="ci-id">${it.id}</span>`;
+        row.addEventListener("click", () => openRepo(it.id, it.type, ""));
+        itemsBox.appendChild(row);
+      });
+      const hidden = d.total - d.items.length;
+      if (hidden > 0) {
+        const note = document.createElement("div");
+        note.className = "sel-summary";
+        note.style.padding = "8px 0 2px";
+        note.textContent = `+${hidden} non-downloadable item(s) hidden (spaces/papers)`;
+        itemsBox.appendChild(note);
+      }
+    } catch (e) {
+      itemsBox.innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+    }
+  });
   return el;
 }
 
@@ -358,4 +468,4 @@ $("#saveSettings").addEventListener("click", async () => {
 
 // ---------- init ----------
 startStream();
-doSearch();
+loadDiscover();
